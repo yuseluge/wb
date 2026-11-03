@@ -1,0 +1,116 @@
+name: 采集学习通数据
+
+# 每天早上 6:17（北京时间）跑一次。
+# 22:17 UTC 是刻意的 —— 整点的 cron 全世界都在挤，GitHub 会延迟甚至丢弃。
+# 每天跑是因为要发截止提醒：一周一次的话，周中发的作业等于没有提醒。
+on:
+  schedule:
+    - cron: '17 22 * * *'      # 22:17 UTC = 次日 06:17 北京
+  workflow_dispatch:            # 也可以在 Actions 页面手动点
+    inputs:
+      test_push:
+        description: '发一条测试提醒（即使没有到期项）—— 用来验证微信推送通不通'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: collect
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install --quiet requests cryptography
+
+      # Cookie 走环境变量再落盘，避免 shell 二次处理把 %2B 这类转义弄坏
+      - name: 写入 Cookie
+        env:
+          CX_COOKIES: ${{ secrets.CHAOXING_COOKIES }}
+        run: |
+          python - <<'PY'
+          import os, pathlib, json
+          raw = os.environ.get("CX_COOKIES", "").strip()
+          if not raw:
+              raise SystemExit("Secret CHAOXING_COOKIES 是空的")
+          json.loads(raw)           # 不是合法 JSON 就早点报错
+          pathlib.Path("collector/cookies.json").write_text(raw, encoding="utf-8")
+          print("cookie 写入成功")
+          PY
+
+      # 全量采集（含历史）。146 条活动约 130KB，不值得为省这点体积砍掉
+      # 历史通知 —— 搜索旧通知是有用的。想裁剪就加 --only-new。
+      - name: 采集活动
+        run: python collector/collect.py
+
+      # 作业走另一套接口（mooc1 的 work/list），和活动互不覆盖。
+      # 失败不阻塞主流程：作业接口比活动接口脆，挂了也不该让提醒停摆。
+      - name: 采集作业
+        continue-on-error: true
+        run: python collector/collect_work.py
+
+      # 把作业并进 activities.json，页面只认这一份数据。
+      - name: 合并作业
+        run: python collector/merge.py
+
+      # 采到 0 条基本就是 Cookie 过期了 —— 主动失败，让 GitHub 发邮件提醒
+      - name: 校验结果
+        run: |
+          python - <<'PY'
+          import json, sys
+          d = json.load(open("collector/out/activities.json", encoding="utf-8"))
+          s = d["stats"]
+          print("课程", s["courses"], "| 活动", s["activities"], "| 待截止", s["withDeadline"])
+          if s["activities"] == 0:
+              sys.exit("采集到 0 条活动 —— Cookie 大概率过期了，请更新 Secret CHAOXING_COOKIES")
+          if s["failedCourses"] > s["courses"] * 0.5:
+              sys.exit(f'{s["failedCourses"]}/{s["courses"]} 门课采集失败，检查登录态')
+          PY
+
+      # 加密后才提交。仓库是公开的，明文绝不能进 git。
+      # 没设 WORKBENCH_PASSWORD 就失败 —— 悄悄退化成明文上传正是要防的事。
+      - name: 加密数据
+        env:
+          WORKBENCH_PASSWORD: ${{ secrets.WORKBENCH_PASSWORD }}
+        run: python collector/encrypt.py
+
+      - name: 提交数据
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add collector/out/activities.enc
+          # 万一有历史遗留的明文被 add 进来，这里拦一下
+          if git diff --staged --name-only | grep -q 'activities\.json$'; then
+            echo "::error::明文 activities.json 进了暂存区，拒绝提交"
+            git reset -q collector/out/activities.json
+            exit 1
+          fi
+          if git diff --staged --quiet; then
+            echo "数据没有变化"
+          else
+            git commit -m "chore: 更新学习通数据 $(date -u +%F)"
+            git push
+          fi
+
+      # 推到微信。没配 secret 就自动跳过（脚本内部判断），不会让任务变红。
+      # 配置方法见 README「配微信提醒」。
+      - name: 发截止提醒
+        env:
+          SERVERCHAN_KEY: ${{ secrets.SERVERCHAN_KEY }}
+          PUSHPLUS_TOKEN: ${{ secrets.PUSHPLUS_TOKEN }}
+        run: |
+          if [ "${{ inputs.test_push }}" = "true" ]; then
+            echo "测试模式：强制发一条"
+            python collector/notify.py --days 3 --force
+          else
+            python collector/notify.py --days 3
+          fi

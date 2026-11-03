@@ -1,0 +1,29 @@
+# 登录凭据 —— 等同于账号密码，绝对不能提交
+collector/cookies.json
+collector/cookies*.json
+.env
+.env.local
+
+# 明文数据只在本地和 CI 的临时目录里存在，绝不提交 ——
+# 仓库是公开的，里面是 63 门课、146 条通知的全文（课程名、老师名、作业要求）。
+# 跟着仓库走的是加密后的 activities.enc。
+collector/out/activities.json
+collector/out/works.json
+
+# 临时文件
+collector/out/*.tmp
+collector/_probe*.py
+collector/_probe*.json
+collector/_analysis.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

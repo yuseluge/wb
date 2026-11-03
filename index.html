@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#4f46e5">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>我的工作台</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg">
+<style>
+:root{
+  --bg:#f4f5f7; --card:#fff; --line:#e6e8ec; --fg:#1a1d23; --dim:#6b7280;
+  --accent:#4f46e5; --accent-soft:#eef0ff;
+  --danger:#e5484d; --danger-soft:#fdecec;
+  --warn:#e0820a; --warn-soft:#fef4e2;
+  --ok:#16a34a; --ok-soft:#e8f6ed;
+  --r:14px;
+}
+@media (prefers-color-scheme:dark){
+  :root{ --bg:#0f1115; --card:#181b21; --line:#272b33; --fg:#e8eaed; --dim:#9aa1ad;
+         --accent:#7c83ff; --accent-soft:#1e2033; --danger-soft:#2d1a1c;
+         --warn-soft:#2d2416; --ok-soft:#152a1e; }
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%}
+body{
+  background:var(--bg); color:var(--fg);
+  font:15px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  overscroll-behavior-y:none;
+}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+input,textarea{font:inherit;color:inherit}
+
+#app{max-width:760px;margin:0 auto;min-height:100%;display:flex;flex-direction:column}
+header{
+  position:sticky;top:0;z-index:20;background:var(--card);border-bottom:1px solid var(--line);
+  padding:calc(env(safe-area-inset-top) + 12px) 16px 12px;
+  display:flex;align-items:center;gap:10px;
+}
+header h1{font-size:17px;margin:0;flex:1;font-weight:650}
+header .sub{font-size:11px;color:var(--dim);font-weight:400;display:block;margin-top:2px}
+.iconbtn{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;
+         color:var(--dim);transition:.15s}
+.iconbtn:hover{background:var(--bg);color:var(--fg)}
+.iconbtn.spin svg{animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+main{flex:1;padding:14px 14px calc(76px + env(safe-area-inset-bottom))}
+.panel{display:none}
+.panel.on{display:block;animation:fade .18s ease}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}}
+
+nav{
+  position:fixed;bottom:0;left:50%;transform:translateX(-50%);
+  width:100%;max-width:760px;z-index:30;
+  background:color-mix(in srgb,var(--card) 92%,transparent);
+  backdrop-filter:blur(14px);border-top:1px solid var(--line);
+  display:flex;padding-bottom:env(safe-area-inset-bottom);
+}
+nav button{flex:1;padding:9px 0 10px;display:flex;flex-direction:column;align-items:center;
+           gap:3px;font-size:10.5px;color:var(--dim);transition:.15s;position:relative}
+nav button.on{color:var(--accent)}
+nav .badge{position:absolute;top:3px;left:50%;transform:translateX(9px);
+           background:var(--danger);color:#fff;font-size:9px;line-height:1;
+           padding:2px 5px;border-radius:8px}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+      padding:13px 14px;margin-bottom:9px}
+.chip{display:inline-block;font-size:11px;padding:2px 7px;border-radius:6px;
+      background:var(--accent-soft);color:var(--accent);white-space:nowrap}
+.muted{color:var(--dim);font-size:12.5px}
+.sect{font-size:12px;color:var(--dim);margin:16px 2px 8px;font-weight:600;
+      letter-spacing:.3px;display:flex;align-items:center;gap:8px}
+.sect .n{background:var(--line);color:var(--dim);border-radius:8px;padding:0 6px;font-size:10.5px}
+.sect .sp{flex:1}
+.sect button.mini{font-size:11.5px;color:var(--accent);font-weight:500}
+.empty{text-align:center;color:var(--dim);padding:48px 24px;font-size:13.5px;line-height:1.9}
+
+/* 逾期提醒条 */
+.alert{background:var(--danger-soft);border:1px solid transparent;border-radius:var(--r);
+       padding:11px 14px;margin-bottom:12px;font-size:13.5px;color:var(--danger)}
+.alert.warn{background:var(--warn-soft);color:var(--warn)}
+.alert b{font-weight:650}
+.alert .go{float:right;color:inherit;opacity:.75;font-size:12.5px}
+
+/* 待办 */
+.todo{display:flex;gap:12px;align-items:flex-start}
+.tick{flex:0 0 24px;width:24px;height:24px;margin-top:1px;border:2px solid var(--line);
+      border-radius:8px;display:grid;place-items:center;transition:.15s}
+.tick:active{transform:scale(.88)}
+.todo.done .tick{background:var(--ok);border-color:var(--ok);animation:pop .25s}
+@keyframes pop{50%{transform:scale(1.18)}}
+.tick svg{opacity:0;color:#fff;transition:.15s}
+.todo.done .tick svg{opacity:1}
+.todo .txt{flex:1;min-width:0}
+.todo.done .txt{opacity:.4}
+.todo.done .t{text-decoration:line-through}
+.todo .t{font-weight:520;word-break:break-word}
+.cd{font-size:11.5px;font-weight:600;padding:3px 8px;border-radius:7px;white-space:nowrap}
+.cd.over{background:var(--danger-soft);color:var(--danger)}
+.cd.today{background:var(--warn-soft);color:var(--warn)}
+.cd.soon{background:var(--accent-soft);color:var(--accent)}
+.cd.later{background:var(--line);color:var(--dim)}
+.meta{display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap}
+.meta a{color:var(--accent);text-decoration:none}
+
+/* 通知 */
+.notice{cursor:pointer}
+.notice .hd{display:flex;gap:8px;align-items:baseline}
+.notice .ti{flex:1;font-weight:520;word-break:break-word}
+.notice .date{font-size:11.5px;color:var(--dim);white-space:nowrap}
+.notice .body{margin-top:9px;padding-top:9px;border-top:1px dashed var(--line);
+              font-size:13.5px;color:var(--dim);white-space:pre-wrap;word-break:break-word;
+              max-height:300px;overflow:auto}
+.notice .more{font-size:11.5px;color:var(--accent);margin-top:6px}
+.tools{display:flex;gap:8px;margin-bottom:12px}
+.tools input{flex:1;background:var(--card);border:1px solid var(--line);border-radius:11px;
+             padding:10px 13px;outline:none}
+.tools input:focus{border-color:var(--accent)}
+.filters{display:flex;gap:6px;overflow-x:auto;padding-bottom:10px;scrollbar-width:none}
+.filters::-webkit-scrollbar{display:none}
+.filters button{font-size:12.5px;padding:6px 12px;border-radius:9px;background:var(--card);
+                border:1px solid var(--line);color:var(--dim);white-space:nowrap}
+.filters button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+
+/* 看板 */
+.cols{display:grid;gap:10px}
+@media(min-width:620px){.cols{grid-template-columns:1fr 1fr 1fr}}
+.col{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:11px}
+.col h3{font-size:12.5px;margin:0 0 9px;color:var(--dim);font-weight:600}
+.col h3 span{float:right;font-weight:400}
+.kcard{background:var(--bg);border-radius:10px;padding:9px 11px;margin-bottom:7px;
+       font-size:13.5px;word-break:break-word}
+.kcard .act{display:flex;gap:6px;margin-top:7px}
+.kcard .act button{font-size:11px;color:var(--dim);padding:2px 7px;border-radius:6px;
+                   border:1px solid var(--line)}
+.kcard .act button:hover{color:var(--accent);border-color:var(--accent)}
+
+/* 设置 */
+.row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;
+     border-bottom:1px solid var(--line);gap:12px}
+.row:last-child{border:0}
+.row .lab{flex:1}
+.btn{background:var(--accent);color:#fff;border-radius:10px;padding:9px 16px;font-size:13.5px;
+     white-space:nowrap}
+.btn.ghost{background:none;border:1px solid var(--line);color:var(--fg)}
+.btn.danger{background:var(--danger)}
+.btn[disabled]{opacity:.5}
+.pill{font-size:11.5px;padding:3px 9px;border-radius:8px;background:var(--line);color:var(--dim)}
+.pill.on{background:var(--ok-soft);color:var(--ok)}
+.notetoast{position:fixed;left:50%;bottom:88px;transform:translateX(-50%);z-index:50;
+           background:var(--fg);color:var(--bg);padding:9px 17px;border-radius:10px;
+           font-size:13px;opacity:0;pointer-events:none;transition:.25s;max-width:88vw;text-align:center}
+.notetoast.on{opacity:1;transform:translate(-50%,-6px)}
+
+/* 解锁 */
+.lock{position:fixed;inset:0;z-index:100;background:var(--bg);
+      display:grid;place-items:center;padding:24px}
+.lock[hidden]{display:none}
+.lockbox{width:100%;max-width:340px;text-align:center}
+.lockbox .ic{width:52px;height:52px;margin:0 auto 14px;border-radius:15px;
+             background:var(--accent-soft);color:var(--accent);display:grid;place-items:center}
+.lockbox h2{font-size:16.5px;margin:0 0 5px;font-weight:650}
+.lockbox p{margin:0 0 18px;font-size:12.5px;color:var(--dim);line-height:1.7}
+.lockbox input{width:100%;text-align:center;background:var(--card);border:1px solid var(--line);
+               border-radius:12px;padding:12px 14px;outline:none;margin-bottom:10px;
+               letter-spacing:1px}
+.lockbox input:focus{border-color:var(--accent)}
+.lockbox .btn{width:100%;padding:12px}
+.err{color:var(--danger);font-size:12.5px;margin-top:10px;min-height:18px}
+.linkbtn{color:var(--accent);font-size:12.5px;margin-top:16px;text-decoration:underline;
+         text-underline-offset:3px}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div style="flex:1">
+      <h1 id="ttl">待办</h1>
+      <span class="sub" id="sub">正在载入…</span>
+    </div>
+    <button class="iconbtn" id="refresh" title="同步学习通">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 3v6h-6"/></svg>
+    </button>
+    <button class="iconbtn" id="gear" title="设置">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2 2 2 0 1 1-4 0 1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3 15a2 2 0 1 1 0-4 1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.4-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 9 4.6a2 2 0 1 1 4 0 1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9 2 2 0 1 1 0 4 1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </button>
+  </header>
+
+  <main>
+    <section class="panel on" id="p-todo"></section>
+    <section class="panel" id="p-notice"></section>
+    <section class="panel" id="p-board"></section>
+    <section class="panel" id="p-set"></section>
+  </main>
+
+  <nav>
+    <button data-tab="todo" class="on">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      待办<span class="badge" id="bdgTodo" hidden></span></button>
+    <button data-tab="notice">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+      通知<span class="badge" id="bdgNotice" hidden></span></button>
+    <button data-tab="board">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="18" rx="1"/><rect x="14" y="3" width="7" height="11" rx="1"/></svg>
+      项目</button>
+  </nav>
+</div>
+<div class="notetoast" id="toast"></div>
+
+<div class="lock" id="lock" hidden>
+  <div class="lockbox">
+    <div class="ic">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    </div>
+    <h2>解锁学习通数据</h2>
+    <p>通知全文是加密存在公开仓库里的<br>输入你自己设的那个密码</p>
+    <input type="password" id="pwin" placeholder="密码" autocomplete="current-password">
+    <button class="btn" id="pwok">解锁</button>
+    <div class="err" id="pwerr"></div>
+    <button class="linkbtn" id="pwwhy">这是什么？</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* =========================================================================
+   我的工作台
+   - 学习通数据：collector 抓的同源 JSON（通知 + 作业 + 截止时间）
+   - 本地数据：待办、项目（localStorage）
+   - Store 是唯一读写入口，以后换云端只改这一个对象
+   ========================================================================= */
+
+const Store = {
+  get(k, dflt) {
+    try { const v = localStorage.getItem('wb.' + k); return v === null ? dflt : JSON.parse(v); }
+    catch (e) { return dflt; }
+  },
+  set(k, v) { try { localStorage.setItem('wb.' + k, JSON.stringify(v)); } catch (e) {} },
+  del(k) { localStorage.removeItem('wb.' + k); },
+};
+
+const SRC_ENC = 'collector/out/activities.enc';    // 加密的，跟着仓库走
+const SRC_JSON = 'collector/out/activities.json';  // 明文，只在本地存在，没提交
+const REMIND_AHEAD = 3;      // 提前几天开始提醒
+const STALE_DAYS = 14;       // 逾期这么久算"积压"
+
+/* ------------------------------------------------ 解密
+   仓库是公开的（Free 计划的 Pages 只能用公开仓库），所以通知全文加密存。
+   密钥只在这台设备的 localStorage 和 GitHub Secret 里。 */
+const b64d = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+
+async function decryptEnv(env, password) {
+  const enc = new TextEncoder();
+  const base = await crypto.subtle.importKey(
+    'raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
+  const key = await crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt: b64d(env.salt), iterations: env.iter, hash: 'SHA-256' },
+    base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+  const pt = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: b64d(env.iv) }, key, b64d(env.ct));
+  return new TextDecoder().decode(pt);
+}
+
+/** 拿到学习通数据。加密优先，明文只在本地开发时兜底 */
+async function loadXxt() {
+  const bust = '?t=' + Date.now();
+
+  let env = null;
+  try {
+    const r = await fetch(SRC_ENC + bust, { cache: 'no-store' });
+    if (r.ok) env = await r.json();
+  } catch (e) { /* 文件不存在或断网，走下面的回退 */ }
+
+  if (env) {
+    // crypto.subtle 只在 https / localhost 下可用。局域网 http://192.168.x.x
+    // 打开时会没有它 —— 那就直接退到明文，别把人挡在门外。
+    if (!crypto.subtle) throw new Error('需要 https 才能解密');
+    const pw = Store.get('pw', null);
+    if (!pw) { state.locked = '首次使用，输入密码'; return null; }
+    try {
+      return JSON.parse(await decryptEnv(env, pw));
+    } catch (e) {
+      // 密码错了，或者云端换了密码。别把存的密码删掉 ——
+      // 用户可能只是手滑输错，下次还要用对的。
+      state.locked = '密码不对，再试一次';
+      return null;
+    }
+  }
+
+  // 本地开发兜底：没加密文件就读明文（明文已被 gitignore，不会被部署）
+  try {
+    const r2 = await fetch(SRC_JSON + bust, { cache: 'no-store' });
+    if (r2.ok) return await r2.json();
+  } catch (e) {}
+
+  throw new Error('没有数据文件，先跑 collector/collect.py');
+}
+
+const state = {
+  tab: Store.get('tab', 'todo'),
+  xxt: Store.get('xxt', null),
+  fetchedAt: Store.get('fetchedAt', 0),
+  todos: Store.get('todos', []),
+  board: Store.get('board', [
+    { id: 'idea', name: '想法', items: [] },
+    { id: 'doing', name: '进行中', items: [] },
+    { id: 'done', name: '已完成', items: [] },
+  ]),
+  filter: 'all',
+  q: '',
+  open: {},                  // 展开正文的通知 id
+  showStale: Store.get('showStale', true),
+  locked: null,              // 非 null 就是锁着，值是给用户看的原因
+};
+
+const save = (k) => Store.set(k, state[k]);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g,
+  c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const $ = (s) => document.querySelector(s);
+
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg; t.classList.add('on');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => t.classList.remove('on'), 2400);
+}
+
+/* ------------------------------------------------ 日期 */
+const DAY = 86400000;
+const dayStart = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
+function daysLeft(due) { return Math.round((dayStart(due) - dayStart(new Date())) / DAY); }
+function fmtDate(s) {
+  if (!s) return '';
+  const d = new Date(s);
+  return `${d.getMonth() + 1}月${d.getDate()}日`;
+}
+function relTime(s) {
+  if (!s) return '';
+  const diff = (Date.now() - new Date(s)) / DAY;
+  if (dayStart(new Date()) - dayStart(new Date(s)) === 0) return '今天';
+  if (diff < 2) return '昨天';
+  if (diff < 7) return `${Math.floor(diff)}天前`;
+  return fmtDate(s);
+}
+const cdClass = (n) => n < 0 ? 'over' : n === 0 ? 'today' : n <= 3 ? 'soon' : 'later';
+function cdText(n) {
+  if (n < 0) return `逾期 ${-n} 天`;
+  if (n === 0) return '今天截止';
+  if (n === 1) return '明天截止';
+  return `还有 ${n} 天`;
+}
+
+/* ------------------------------------------------ 同步 */
+async function syncXxt(manual) {
+  const btn = $('#refresh');
+  btn.classList.add('spin');
+  try {
+    const j = await loadXxt();
+    if (!j) { renderLock(); return; }        // 锁着，等用户输密码
+    state.locked = null;
+    state.xxt = j;
+    state.fetchedAt = Date.now();
+    save('xxt'); save('fetchedAt');
+    renderLock();
+    render();
+    checkReminders();
+    if (manual) toast(`已同步 ${j.stats.activities} 条`);
+  } catch (e) {
+    // 解不开就别用旧缓存假装没事 —— 新旧数据混在一起更容易出错
+    if (manual || !state.xxt) toast(e.message || '同步失败');
+    console.warn(e);
+  } finally {
+    btn.classList.remove('spin');
+  }
+}
+
+/* ------------------------------------------------ 解锁界面 */
+function renderLock() {
+  const el = $('#lock');
+  el.hidden = !state.locked;
+  $('#pwerr').textContent = state.locked && state.locked !== '首次使用，输入密码'
+    ? state.locked : '';
+  if (state.locked) setTimeout(() => $('#pwin').focus(), 50);
+}
+
+async function tryUnlock() {
+  const pw = $('#pwin').value;
+  if (!pw) return;
+  $('#pwok').disabled = true;
+  $('#pwok').textContent = '解密中…';
+  try {
+    const r = await fetch(SRC_ENC + '?t=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) throw new Error('拿不到加密文件');
+    const j = JSON.parse(await decryptEnv(await r.json(), pw));
+
+    Store.set('pw', pw);              // 存下来，下次自动解
+    state.locked = null;
+    state.xxt = j;
+    state.fetchedAt = Date.now();
+    save('xxt'); save('fetchedAt');
+    $('#pwin').value = '';
+    renderLock();
+    render();
+    checkReminders();
+    toast('解锁成功');
+  } catch (e) {
+    state.locked = '密码不对，再试一次';
+    $('#pwerr').textContent = state.locked;
+    $('#pwin').select();
+  } finally {
+    $('#pwok').disabled = false;
+    $('#pwok').textContent = '解锁';
+  }
+}
+
+/* ------------------------------------------------ 待办数据 */
+/** 学习通的 DDL + 手动的待办，合成一个列表 */
+function allTodos() {
+  const doneXxt = Store.get('doneXxt', {});
+  const items = [];
+
+  for (const a of (state.xxt?.activities || [])) {
+    if (!a.deadline) continue;
+    const key = 'x' + a.id;
+    items.push({
+      key, src: 'xxt', text: a.title, course: a.courseName, author: a.author,
+      due: a.deadline + 'T23:59:59', raw: a, done: !!doneXxt[key],
+    });
+  }
+  for (const t of state.todos) {
+    items.push({
+      key: 'l' + t.id, src: 'local', id: t.id, text: t.text,
+      course: t.course || '', author: '', due: t.due ? t.due + 'T23:59:59' : null,
+      done: !!t.done,
+    });
+  }
+
+  return items.sort((a, b) => {
+    if (!!a.done !== !!b.done) return a.done ? 1 : -1;
+    if (!a.due) return 1;
+    if (!b.due) return -1;
+    return new Date(a.due) - new Date(b.due);
+  });
+}
+
+/** 未完成的、有截止时间的 —— 提醒和角标都基于它 */
+const dueItems = () => allTodos().filter(i => !i.done && i.due);
+
+/* ------------------------------------------------ 待办渲染 */
+function renderTodo() {
+  const items = allTodos();
+  const open = items.filter(i => !i.done);
+  const overdue = open.filter(i => i.due && daysLeft(i.due) < 0);
+  const n = (i) => i.due ? daysLeft(i.due) : null;
+
+  const groups = [
+    ['逾期', overdue.filter(i => n(i) >= -STALE_DAYS)],
+    ['今天', open.filter(i => n(i) === 0)],
+    ['三天内', open.filter(i => n(i) > 0 && n(i) <= 3)],
+    ['一周内', open.filter(i => n(i) > 3 && n(i) <= 7)],
+    ['更远', open.filter(i => n(i) > 7)],
+    ['没有截止时间', open.filter(i => !i.due)],
+  ];
+  const stale = overdue.filter(i => n(i) < -STALE_DAYS);
+  const finished = items.filter(i => i.done);
+
+  let h = `<div class="tools">
+      <input id="newtodo" placeholder="添加待办，回车确认（可写 @9-20 定日期）…" autocomplete="off">
+    </div>`;
+
+  // 今天到期 / 已逾期的，单独顶到最上面
+  const today = open.filter(i => n(i) === 0);
+  const late = overdue.filter(i => n(i) >= -STALE_DAYS);
+  if (late.length) h += `<div class="alert"><b>${late.length} 项已逾期</b>
+      —— 做完就点左边的方框划掉
+      <button class="go" data-clear="late">全部清掉</button></div>`;
+  else if (today.length) h += `<div class="alert warn"><b>今天有 ${today.length} 项要交</b></div>`;
+
+  if (!items.length) {
+    h += `<div class="empty">还没有待办<br>
+      <span style="font-size:12.5px">点右上角 ⟳ 同步学习通，或直接在上面输入</span></div>`;
+  }
+
+  for (const [name, list] of groups) {
+    if (!list.length) continue;
+    h += `<div class="sect">${name}<span class="n">${list.length}</span></div>`;
+    for (const i of list) h += todoCard(i);
+  }
+
+  // 上学期遗留的积压 —— 默认就展开，用户要能一条条划掉或一键清空
+  if (stale.length) {
+    h += `<div class="sect">积压<span class="n">${stale.length}</span><span class="sp"></span>
+      <button class="mini" data-clear="stale">全部清掉</button>
+      <button class="mini" id="staleToggle">${state.showStale ? '收起' : '展开'}</button></div>`;
+    if (state.showStale) for (const i of stale) h += todoCard(i);
+  }
+
+  if (finished.length) {
+    h += `<div class="sect">已完成<span class="n">${finished.length}</span><span class="sp"></span>
+      <button class="mini" data-clear="done">清空</button></div>`;
+    for (const i of finished) h += todoCard(i);
+  }
+
+  $('#p-todo').innerHTML = h;
+}
+
+function todoCard(i) {
+  const n = i.due ? daysLeft(i.due) : null;
+  const link = i.raw?.idCode
+    ? `https://notice.chaoxing.com/pc/course/notice/${i.raw.idCode}/detail` : '';
+  return `<div class="card">
+    <div class="todo ${i.done ? 'done' : ''}">
+      <button class="tick" data-key="${esc(i.key)}" data-src="${i.src}"
+              ${i.id ? `data-id="${i.id}"` : ''} title="标记完成">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="3.5" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>
+      </button>
+      <div class="txt">
+        <div class="t">${esc(i.text)}</div>
+        <div class="meta">
+          ${i.course ? `<span class="chip">${esc(i.course)}</span>` : ''}
+          ${i.author ? `<span class="muted">${esc(i.author)}</span>` : ''}
+          ${i.due ? `<span class="muted">${fmtDate(i.due)}</span>` : ''}
+          ${link ? `<a href="${link}" target="_blank">学通 ›</a>` : ''}
+        </div>
+      </div>
+      ${n !== null ? `<span class="cd ${cdClass(n)}">${cdText(n)}</span>` : ''}
+    </div>
+  </div>`;
+}
+
+function toggleTodo(key, src, id) {
+  if (src === 'xxt') {
+    const d = Store.get('doneXxt', {});
+    if (d[key]) delete d[key]; else d[key] = Date.now();
+    Store.set('doneXxt', d);
+  } else {
+    const t = state.todos.find(x => x.id === id);
+    if (t) { t.done = !t.done; save('todos'); }
+  }
+  render();
+}
+
+/** 批量清掉某一组 */
+function clearGroup(which) {
+  const items = allTodos();
+  const n = (i) => i.due ? daysLeft(i.due) : null;
+  if (which === 'done') {
+    state.todos = state.todos.filter(t => !t.done);
+    save('todos');
+    Store.set('doneXxt', {});
+  } else {
+    const list = items.filter(i => !i.done && i.due &&
+      (which === 'late' ? n(i) >= -STALE_DAYS && n(i) < 0 : n(i) < -STALE_DAYS));
+    const d = Store.get('doneXxt', {});
+    for (const i of list) {
+      if (i.src === 'xxt') d[i.key] = Date.now();
+      else { const t = state.todos.find(x => x.id === i.id); if (t) t.done = true; }
+    }
+    Store.set('doneXxt', d); save('todos');
+  }
+  render();
+}
+
+function addTodo(text) {
+  text = text.trim();
+  if (!text) return;
+  let due = null;
+  const m = text.match(/\s*@(\d{4}-)?(\d{1,2})-(\d{1,2})\s*$/);
+  if (m) {
+    const y = m[1] ? m[1].slice(0, 4) : new Date().getFullYear();
+    due = `${y}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}`;
+    text = text.slice(0, m.index).trim();
+  }
+  state.todos.push({ id: Date.now() + '' + Math.floor(Math.random() * 1000),
+                     text, due, done: false, createdAt: Date.now() });
+  save('todos');
+  render();
+}
+
+/* ------------------------------------------------ 提醒 */
+const canNotify = () => 'Notification' in window;
+
+/** 现在该提醒哪些？每条在每个档位只提醒一次 */
+function pendingReminders() {
+  const sent = Store.get('notified', {});
+  const out = [];
+  for (const i of dueItems()) {
+    const n = daysLeft(i.due);
+    if (n < 0) continue;                       // 逾期的别天天轰炸
+    const level = n === 0 ? 'today' : n <= 1 ? 'd1' : n <= REMIND_AHEAD ? `d${n}` : null;
+    if (!level) continue;
+    const stamp = `${i.key}@${level}`;
+    if (sent[stamp]) continue;
+    out.push({ item: i, level, stamp, n });
+  }
+  return out;
+}
+
+/** 弹系统通知。网页关着就不会响 —— 想随时收到得配微信推送（见设置页） */
+function checkReminders() {
+  const list = pendingReminders();
+  if (!list.length) return 0;
+  if (!canNotify() || Notification.permission !== 'granted') return list.length;
+
+  const sent = Store.get('notified', {});
+  for (const r of list) {
+    const title = `${cdText(r.n)}：${r.item.text.slice(0, 36)}`;
+    const body = [r.item.course, fmtDate(r.item.due) + ' 截止']
+      .filter(Boolean).join(' · ');
+    try {
+      new Notification(title, { body, tag: r.stamp, icon: 'icon-192.png' });
+    } catch (e) { /* 某些环境构造 Notification 会抛，忽略 */ }
+    sent[r.stamp] = Date.now();
+  }
+  // 顺手清掉两个月前的记录，别让它无限长大
+  const cut = Date.now() - 60 * DAY;
+  for (const k of Object.keys(sent)) if (sent[k] < cut) delete sent[k];
+  Store.set('notified', sent);
+  return list.length;
+}
+
+async function askNotify() {
+  if (!canNotify()) return toast('这个浏览器不支持系统通知');
+  const p = await Notification.requestPermission();
+  render();
+  if (p === 'granted') { toast('提醒已开启'); checkReminders(); }
+  else toast('你拒绝了通知权限');
+}
+
+/* ------------------------------------------------ 通知页 */
+function renderNotice() {
+  const acts = state.xxt?.activities || [];
+  const q = state.q.toLowerCase();
+
+  let list = acts.filter(a => a.type === 45 || a.type === 35);
+  if (state.filter === 'dl') list = list.filter(a => a.deadline);
+  if (state.filter === 'body') list = list.filter(a => a.body);
+  if (q) {
+    list = list.filter(a =>
+      (a.title + a.body + a.courseName + a.author).toLowerCase().includes(q));
+  }
+
+  const chips = [['all', '全部'], ['dl', '有截止'], ['body', '有正文']];
+  let h = `<div class="tools"><input id="q" placeholder="搜索通知、课程、老师…"
+             value="${esc(state.q)}" autocomplete="off"></div>
+    <div class="filters">${chips.map(([k, nm]) =>
+      `<button data-f="${k}" class="${state.filter === k ? 'on' : ''}">${nm}</button>`).join('')}
+      <button data-f="course">按课程</button></div>`;
+
+  if (!list.length) {
+    h += `<div class="empty">${acts.length ? '没有匹配的通知'
+      : '还没有数据<br>点右上角 ⟳ 同步学习通'}</div>`;
+    $('#p-notice').innerHTML = h;
+    bindNotice();
+    return;
+  }
+
+  if (state.filter === 'course') {
+    const byCourse = {};
+    for (const a of list) (byCourse[a.courseName] ||= []).push(a);
+    for (const [course, arr] of Object.entries(byCourse)
+           .sort((a, b) => b[1].length - a[1].length)) {
+      h += `<div class="sect">${esc(course)}<span class="n">${arr.length}</span></div>`;
+      for (const a of arr) h += noticeCard(a);
+    }
+  } else {
+    for (const a of list) h += noticeCard(a);
+  }
+
+  $('#p-notice').innerHTML = h;
+  bindNotice();
+}
+
+function noticeCard(a) {
+  const isOpen = state.open[a.id];
+  const n = a.deadline ? daysLeft(a.deadline + 'T23:59:59') : null;
+  const link = a.idCode
+    ? `https://notice.chaoxing.com/pc/course/notice/${a.idCode}/detail` : '';
+  return `<div class="card notice" data-id="${a.id}">
+    <div class="hd">
+      <div class="ti">${esc(a.title || a.typeName)}</div>
+      <div class="date">${relTime(a.startAt)}</div>
+    </div>
+    <div class="meta">
+      <span class="chip">${esc(a.courseName)}</span>
+      ${a.author ? `<span class="muted">${esc(a.author)}</span>` : ''}
+      ${a.deadline ? `<span class="cd ${cdClass(n)}">${cdText(n)}</span>` : ''}
+    </div>
+    ${isOpen && a.body ? `<div class="body">${esc(a.body)}</div>` : ''}
+    ${!isOpen && a.body ? `<div class="more">展开正文 ›</div>` : ''}
+    ${isOpen && link ? `<div class="more"><a href="${link}" target="_blank"
+        style="color:var(--accent);text-decoration:none">在学通中打开 ›</a></div>` : ''}
+  </div>`;
+}
+
+function bindNotice() {
+  const qi = $('#q');
+  if (qi) {
+    qi.oninput = (e) => {
+      state.q = e.target.value;
+      const pos = e.target.selectionStart;
+      renderNotice();
+      const nq = $('#q'); nq.focus(); nq.setSelectionRange(pos, pos);
+    };
+  }
+  $('#p-notice').querySelectorAll('.filters button').forEach(b => {
+    b.onclick = () => { state.filter = b.dataset.f; renderNotice(); };
+  });
+  $('#p-notice').querySelectorAll('.notice').forEach(el => {
+    el.onclick = (e) => {
+      if (e.target.closest('a')) return;
+      state.open[el.dataset.id] = !state.open[el.dataset.id];
+      renderNotice();
+    };
+  });
+}
+
+/* ------------------------------------------------ 项目看板 */
+function renderBoard() {
+  let h = `<div class="tools"><input id="newcard"
+             placeholder="添加卡片，回车确认…" autocomplete="off"></div><div class="cols">`;
+  state.board.forEach((col, ci) => {
+    h += `<div class="col"><h3>${esc(col.name)}<span>${col.items.length}</span></h3>`;
+    col.items.forEach((it, ii) => {
+      h += `<div class="kcard">${esc(it.text)}<div class="act">
+        ${ci > 0 ? `<button data-mv="${ci}:${ii}:${ci - 1}">‹ 前一列</button>` : ''}
+        ${ci < state.board.length - 1
+          ? `<button data-mv="${ci}:${ii}:${ci + 1}">后一列 ›</button>` : ''}
+        <button data-del="${ci}:${ii}" style="color:var(--danger)">删除</button>
+      </div></div>`;
+    });
+    h += `</div>`;
+  });
+  $('#p-board').innerHTML = h + `</div>`;
+
+  const ni = $('#newcard');
+  if (ni) ni.onkeydown = (e) => {
+    if (e.key !== 'Enter' || !e.target.value.trim()) return;
+    state.board[0].items.push({ text: e.target.value.trim(), at: Date.now() });
+    save('board'); renderBoard();
+  };
+  $('#p-board').querySelectorAll('[data-mv]').forEach(b => {
+    b.onclick = () => {
+      const [from, i, to] = b.dataset.mv.split(':').map(Number);
+      const [it] = state.board[from].items.splice(i, 1);
+      state.board[to].items.push(it);
+      save('board'); renderBoard();
+    };
+  });
+  $('#p-board').querySelectorAll('[data-del]').forEach(b => {
+    b.onclick = () => {
+      const [c, i] = b.dataset.del.split(':').map(Number);
+      state.board[c].items.splice(i, 1);
+      save('board'); renderBoard();
+    };
+  });
+}
+
+/* ------------------------------------------------ 设置 */
+function renderSet() {
+  const st = state.xxt?.stats;
+  const when = state.fetchedAt ? new Date(state.fetchedAt).toLocaleString('zh-CN') : '从未';
+  const perm = !canNotify() ? '不支持'
+    : Notification.permission === 'granted' ? '已开启'
+    : Notification.permission === 'denied' ? '被拒绝' : '未开启';
+
+  $('#p-set').innerHTML = `
+    <div class="card">
+      <div class="sect" style="margin-top:0">截止提醒</div>
+      <div class="row"><div class="lab">系统通知
+          <div class="muted">网页开着的时候，快到期的会弹通知</div></div>
+        <span class="pill ${perm === '已开启' ? 'on' : ''}">${perm}</span></div>
+      ${perm !== '已开启' ? `<div class="row"><span class="muted">现在开启</span>
+        <button class="btn" id="askNotify">开启通知</button></div>` : ''}
+      <div class="row"><div class="lab">试试看
+          <div class="muted">立即检查一次并弹出提醒</div></div>
+        <button class="btn ghost" id="testNotify">测试</button></div>
+      <div class="row"><div class="lab">关闭网页也想收到
+          <div class="muted">需要配微信推送，见下方说明</div></div>
+        <button class="btn ghost" id="howPush">怎么做</button></div>
+    </div>
+
+    <div class="card">
+      <div class="sect" style="margin-top:0">学习通数据</div>
+      <div class="row"><span>活动条数</span>
+        <span class="muted">${st ? `${st.activities} 条` : '未同步'}</span></div>
+      <div class="row"><span>课程数</span><span class="muted">${st?.courses ?? '—'}</span></div>
+      <div class="row"><span>抓到截止时间</span>
+        <span class="muted">${st?.withDeadline ?? '—'} 条</span></div>
+      <div class="row"><span>上次同步</span><span class="muted">${esc(when)}</span></div>
+      <div class="row"><span>采集时间（云端）</span>
+        <span class="muted">${esc(state.xxt?.collectedAt?.slice(0, 16).replace('T', ' ') || '—')}</span></div>
+      <div class="row"><span>立即同步</span>
+        <button class="btn" id="sync2">同步</button></div>
+    </div>
+
+    <div class="card">
+      <div class="sect" style="margin-top:0">数据加密</div>
+      <div class="row"><div class="lab">密码
+          <div class="muted">存在这台设备上，用来解密学习通数据</div></div>
+        <span class="pill ${Store.get('pw', null) ? 'on' : ''}">${
+          Store.get('pw', null) ? '已保存' : '未保存'}</span></div>
+      <div class="row"><div class="lab">忘记密码 / 换了密码
+          <div class="muted">清掉本机记录，下次打开重新输</div></div>
+        <button class="btn ghost" id="forget">清除</button></div>
+    </div>
+
+    <div class="card">
+      <div class="sect" style="margin-top:0">数据</div>
+      <div class="row"><span>导出（含待办和项目）</span>
+        <button class="btn ghost" id="exp">导出 JSON</button></div>
+      <div class="row"><span>导入</span>
+        <button class="btn ghost" id="imp">选择文件</button>
+        <input type="file" id="impf" accept=".json" hidden></div>
+      <div class="row"><span>清空本地数据</span>
+        <button class="btn danger" id="clr">清空</button></div>
+    </div>
+
+    <div class="card muted" style="font-size:12.5px;line-height:1.9">
+      学习通数据由云端采集器定时抓取，本页只读结果。<br>
+      待办和项目存在这台设备的浏览器里，换设备不会同步。<br>
+      把页面「添加到主屏幕」可以当 App 用。
+    </div>`;
+
+  const an = $('#askNotify');
+  if (an) an.onclick = askNotify;
+  $('#testNotify').onclick = async () => {
+    if (!canNotify() || Notification.permission !== 'granted')
+      return toast('先开启通知权限');
+    const pend = pendingReminders();
+    if (!pend.length) {
+      const soon = dueItems().sort((a, b) => new Date(a.due) - new Date(b.due))[0];
+      if (!soon) return toast('没有带截止时间的待办');
+      new Notification('测试提醒', {
+        body: `${soon.text.slice(0, 40)} · ${fmtDate(soon.due)} 截止`,
+        icon: 'icon-192.png',
+      });
+      return toast('已发一条测试通知');
+    }
+    checkReminders();
+    toast(`已提醒 ${pend.length} 条`);
+  };
+  $('#howPush').onclick = () => {
+    alert('微信推送配置：\n\n' +
+      '1. 打开 sct.ftqq.com，微信扫码登录，拿到 SendKey\n' +
+      '2. 在 GitHub 仓库 Settings → Secrets → Actions 新建\n' +
+      '   SERVERCHAN_KEY，值填那个 SendKey\n' +
+      '3. 之后每天采集完会自动把「未来 3 天内到期」推到你微信\n\n' +
+      '没配也能用，只是只在网页开着时才提醒。');
+  };
+  $('#sync2').onclick = () => syncXxt(true);
+  $('#forget').onclick = () => {
+    if (!confirm('清掉本机保存的密码？\n\n下次打开会重新要你输。\n' +
+                 '（只是本机记录，云端和 GitHub Secret 不受影响）')) return;
+    Store.del('pw');
+    Store.del('xxt');          // 缓存里是解密后的明文，一起清掉
+    state.xxt = null;
+    state.locked = '首次使用，输入密码';
+    renderLock();
+    render();
+    toast('已清除，重新输入密码即可');
+  };
+  $('#exp').onclick = () => {
+    const blob = new Blob([JSON.stringify({
+      xxt: state.xxt, todos: state.todos, board: state.board,
+    }, null, 1)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `workbench-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+  $('#imp').onclick = () => $('#impf').click();
+  $('#impf').onchange = async (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    try {
+      const j = JSON.parse(await f.text());
+      for (const k of ['xxt', 'todos', 'board'])
+        if (j[k] !== undefined) { state[k] = j[k]; save(k); }
+      render(); toast('导入成功');
+    } catch (err) { toast('导入失败：不是合法的 JSON'); }
+  };
+  $('#clr').onclick = () => {
+    if (!confirm('会清空待办、项目和缓存的学习通数据，确定？')) return;
+    // xxt 存的是解密后的明文，pw 是密码 —— 一并清掉
+    ['xxt', 'fetchedAt', 'todos', 'board', 'doneXxt', 'notified', 'pw'].forEach(Store.del);
+    location.reload();
+  };
+}
+
+/* ------------------------------------------------ 渲染 & 路由 */
+const TITLES = { todo: '待办', notice: '通知', board: '项目', set: '设置' };
+
+function render() {
+  const x = state.xxt;
+  const due = dueItems();
+  if (x?.stats) {
+    $('#sub').textContent =
+      `${x.stats.courses} 门课 · ${x.stats.activities} 条通知 · ${due.length} 个待截止`;
+  } else {
+    $('#sub').textContent = '正在载入…';
+  }
+
+  // 角标 = 需要你动手的：已逾期 + 未来 7 天内到期。
+  // 清掉之后角标会归零，这也算个把积压处理掉的动力。
+  const soonN = due.filter(i => daysLeft(i.due) <= 7).length;
+  const bt = $('#bdgTodo');
+  bt.hidden = !soonN; bt.textContent = soonN > 99 ? '99+' : soonN;
+
+  const unseen = (x?.activities || []).filter(a => !a.read && a.type === 45).length;
+  const bn = $('#bdgNotice');
+  bn.hidden = !unseen; bn.textContent = unseen > 99 ? '99+' : unseen;
+
+  if (state.tab === 'todo') renderTodo();
+  else if (state.tab === 'notice') renderNotice();
+  else if (state.tab === 'board') renderBoard();
+  else renderSet();
+
+  const p = $('#p-todo');
+  const ni = p.querySelector('#newtodo');
+  if (ni) ni.onkeydown = (e) => {
+    if (e.key === 'Enter') { addTodo(e.target.value); e.target.value = ''; }
+  };
+  p.querySelectorAll('.tick').forEach(b => {
+    b.onclick = () => {
+      toggleTodo(b.dataset.key, b.dataset.src, b.dataset.id);
+      checkReminders();
+    };
+  });
+  p.querySelectorAll('[data-clear]').forEach(b => {
+    b.onclick = () => clearGroup(b.dataset.clear);
+  });
+  const stg = p.querySelector('#staleToggle');
+  if (stg) stg.onclick = () => {
+    state.showStale = !state.showStale;
+    save('showStale');
+    renderTodo();
+  };
+}
+
+function go(tab) {
+  state.tab = tab; save('tab');
+  document.querySelectorAll('.panel').forEach(el =>
+    el.classList.toggle('on', el.id === 'p-' + tab));
+  document.querySelectorAll('nav button').forEach(b =>
+    b.classList.toggle('on', b.dataset.tab === tab));
+  $('#ttl').textContent = TITLES[tab] || '待办';
+  window.scrollTo(0, 0);
+  render();
+}
+
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => go(b.dataset.tab));
+$('#refresh').onclick = () => syncXxt(true);
+$('#gear').onclick = () => go('set');
+
+$('#pwok').onclick = tryUnlock;
+$('#pwin').onkeydown = (e) => { if (e.key === 'Enter') tryUnlock(); };
+$('#pwwhy').onclick = () => alert(
+  '学习通的通知全文（课程名、老师名、作业要求）是加密存在公开仓库里的。\n\n' +
+  '因为 GitHub 免费版只能用公开仓库，不加密的话，任何人搜到你的仓库\n' +
+  '就能读到你所有通知。加密后仓库里只有一团密文。\n\n' +
+  '密码只有两个地方有：GitHub Secret（云端加密用）和这台设备的浏览器。\n' +
+  '我这边也不知道，忘了就得重新设一个再跑一次采集。');
+
+/* 启动 */
+go(state.tab);
+syncXxt(false);              // 每次打开都拉最新的，加密文件里有新 salt，密码存着也能解
+checkReminders();
+setInterval(checkReminders, 15 * 60 * 1000);   // 网页开着时每 15 分钟看一次
+
+// 从后台切回来也检查一次（手机上这是最常见的触发时机）
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) checkReminders();
+});
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
