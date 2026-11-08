@@ -98,7 +98,19 @@ jobs:
             echo "数据没有变化"
           else
             git commit -m "chore: 更新学习通数据 $(date -u +%F)"
-            git push
+            # 每天的 cron 有可能触发两次，两边同时 push 时后到的会被拒。
+            # 冲突不是数据错，只是撞车，rebase 后重试即可。
+            for i in 1 2 3; do
+              if git push; then
+                echo "推送成功（第 $i 次尝试）"
+                exit 0
+              fi
+              echo "推送被拒，第 $i 次：拉取远端后重试"
+              git pull --rebase --autostash origin main || true
+              sleep $((i * 3))
+            done
+            echo "::error::连续 3 次推送失败"
+            exit 1
           fi
 
       # 推到微信。没配 secret 就自动跳过（脚本内部判断），不会让任务变红。
